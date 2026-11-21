@@ -4,10 +4,12 @@ import { clockLabel, httpFailure, minutesLabel, normalizeSchedule } from "../src
 
 const names = { CHW: "柴灣", KET: "堅尼地城", SUN: "欣澳" };
 
-test("minutes and clock", () => {
-  assert.equal(minutesLabel("0"), "即將到站");
-  assert.equal(minutesLabel("2"), "2 分鐘");
-  assert.equal(minutesLabel("-"), "");
+test("minutes come from Hong Kong timestamps, not the dummy ttnt field", () => {
+  assert.equal(minutesLabel("2026-11-21 10:27:56", "2026-11-21 10:25:56"), "2 分鐘");
+  assert.equal(minutesLabel("01:17:00", "01:10:42"), "6 分鐘");
+  assert.equal(minutesLabel("2026-11-21 10:26:20", "2026-11-21 10:25:56"), "即將到站");
+  assert.equal(minutesLabel("2026-11-22 00:02:00", "2026-11-21 23:58:00"), "4 分鐘");
+  assert.equal(minutesLabel("-", "2026-11-21 10:25:56"), "");
   assert.equal(clockLabel("2026-11-21 10:27:56"), "10:27");
 });
 
@@ -18,8 +20,8 @@ test("live trains keep destination, platform and time", () => {
     curr_time: "2026-11-21 10:25:56",
     data: {
       "ISL-CEN": {
-        UP: [{ dest: "CHW", plat: "3", time: "2026-11-21 10:27:56", ttnt: "2", valid: "Y" }],
-        DOWN: [{ dest: "KET", plat: "4", time: "2026-11-21 10:32:56", ttnt: "0", valid: "N" }],
+        UP: [{ dest: "CHW", plat: "3", time: "2026-11-21 10:27:56", ttnt: "9", valid: "Y" }],
+        DOWN: [{ dest: "KET", plat: "4", time: "2026-11-21 10:26:10", ttnt: "0", valid: "N" }],
       },
     },
   }, "ISL", "CEN", names);
@@ -58,6 +60,15 @@ test("a missing direction still leaves the other direction intact", () => {
   }, "DRL", "DIS", names);
   assert.equal(result.directions[0].trains[0].destName, "欣澳");
   assert.equal(result.directions[1].trains.length, 0);
+});
+
+test("a suspension message is shown instead of a generic empty notice", () => {
+  const result = normalizeSchedule({
+    status: 0,
+    message: "LOW station is suspended",
+  }, "TCL", "LOW", names);
+  assert.equal(result.status, "empty");
+  assert.equal(result.notice, "LOW station is suspended");
 });
 
 test("http failures have their own wording", () => {

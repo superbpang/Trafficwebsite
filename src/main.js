@@ -2,6 +2,7 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { LINE_BY_CODE, LINES, lineColorExpression, stationColorExpression } from "./lines.js";
 import { httpFailure, normalizeSchedule } from "./schedule.js";
+import { foldStationText, matchesStation } from "./search.js";
 
 const { Map, NavigationControl } = maplibregl;
 
@@ -21,6 +22,7 @@ const state = {
   namesByCode: {},
   visibleLines: new Set(LINES.map((line) => line.code)),
   requestId: 0,
+  layersReady: false,
 };
 
 function h(tag, props = {}, children = []) {
@@ -61,17 +63,19 @@ function closePanel() {
 }
 
 function stationByQuery(query) {
-  const text = query.trim().toLowerCase();
-  if (!text) return [];
-  return state.stations.filter((station) => {
-    const props = station.properties;
-    return props.name_zh.toLowerCase().includes(text)
-      || props.name_en.toLowerCase().includes(text)
-      || props.code.toLowerCase() === text;
-  });
+  return state.stations.filter((station) => matchesStation(station.properties, query));
+}
+
+function syncLegendPressed() {
+  for (const button of legend.querySelectorAll("[data-line]")) {
+    const on = state.visibleLines.has(button.dataset.line);
+    button.setAttribute("aria-pressed", on ? "true" : "false");
+  }
 }
 
 function applyLineFilter() {
+  syncLegendPressed();
+  if (!state.layersReady || !state.map) return;
   const codes = [...state.visibleLines];
   const lineFilter = ["in", ["get", "code"], ["literal", codes]];
   const stationFilter = ["any", ...codes.map((code) => ["in", code, ["get", "lines"]])];
@@ -79,10 +83,6 @@ function applyLineFilter() {
   state.map.setFilter("line-casing", lineFilter);
   state.map.setFilter("stations", codes.length ? stationFilter : ["==", ["get", "code"], ""]);
   state.map.setFilter("station-labels", codes.length ? stationFilter : ["==", ["get", "code"], ""]);
-  for (const button of legend.querySelectorAll("[data-line]")) {
-    const on = state.visibleLines.has(button.dataset.line);
-    button.setAttribute("aria-pressed", on ? "true" : "false");
-  }
 }
 
 function renderLegend() {
@@ -233,8 +233,10 @@ function canonicalCamera(feature) {
 }
 
 async function openStation(station) {
+  const source = state.map?.getSource("highlight");
+  if (!source) return;
   const requestId = ++state.requestId;
-  state.map.getSource("highlight").setData(station);
+  source.setData(station);
   const names = station.properties.lines.map((code) => LINE_BY_CODE[code]?.name).filter(Boolean).join("、");
   showPanel(panelFrame(
     station.properties.name_zh,
@@ -296,18 +298,22 @@ function installSearch() {
     option.label = station.properties.name_en;
     stationList.append(option);
   }
+  searchInput.disabled = false;
+  searchForm.querySelector("button[type=submit]").disabled = false;
   searchForm.addEventListener("submit", (event) => {
     event.preventDefault();
+    if (!state.map?.getSource("highlight")) return;
     const hits = stationByQuery(searchInput.value);
     if (hits.length === 1) {
       focusStation(hits[0]);
       return;
     }
-    const exact = hits.find((station) => station.properties.name_zh === searchInput.value.trim());
+    const exact = hits.find((station) => foldStationText(station.properties.name_zh) === foldStationText(searchInput.value));
     if (exact) {
       focusStation(exact);
       return;
     }
+    state.requestId += 1;
     if (!hits.length) {
       showPanel(panelFrame("找不到車站", "", [
         h("p", { class: "message" }, "沒有符合的港鐵站。請輸入站名，例如金鐘或中環。"),
@@ -355,7 +361,6 @@ async function main() {
   for (const feature of stations.features) {
     state.namesByCode[feature.properties.code] = feature.properties.name_zh;
   }
-  installSearch();
   if (meta.cameraListModified) {
     sourceNote.textContent = `快拍位置表更新於${formatListDate(meta.cameraListModified)}，照片在點選時即時讀取。`;
   }
@@ -381,6 +386,7 @@ async function main() {
     map.addSource("stations", { type: "geojson", data: stations });
     map.addSource("cameras", { type: "geojson", data: cameras });
     map.addSource("highlight", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    installSearch();
 
     map.addLayer({
       id: "line-casing",
@@ -457,6 +463,8 @@ async function main() {
         "text-halo-width": 1.4,
       },
     });
+    state.layersReady = true;
+    applyLineFilter();
 
     map.on("click", (event) => {
       const hit = hitsAt(event.point);

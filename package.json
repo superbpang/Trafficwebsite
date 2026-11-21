@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 5173",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
-    "test": "node --test scripts/test-schedule.mjs"
+    "test": "node --test scripts/test-schedule.mjs scripts/test-search.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^5.6.1"
