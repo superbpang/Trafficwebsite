@@ -37,7 +37,11 @@ npm run dev
 
 預覽驗收之後，才發佈到 Cloudflare Workers 免費方案，使用帳戶自帶的 `workers.dev` 網址。不使用自訂網域、KV、D1 或 R2。靜態網頁的請求不計入每日程式請求額度，預計費用是 0 美元。
 
+Wrangler 已裝在專案的開發依賴裡。`npm install` 之後可用：
+
 ```bash
-npm run build
-npx wrangler deploy
+npx wrangler login
+npm run deploy
 ```
+
+`npm run deploy` 會先建置網站，再發佈到現有的 `hk-smart-city-map` Worker。正式網址是 https://hk-smart-city-map.superbpang.workers.dev/ 。
