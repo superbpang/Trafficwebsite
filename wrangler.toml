@@ -1,5 +1,8 @@
 name = "hk-smart-city-map"
+account_id = "3f512345e1e442bfb899e74b9d084c7e"
 compatibility_date = "2026-11-21"
+workers_dev = true
+preview_urls = false
 
 [assets]
 directory = "./dist"
