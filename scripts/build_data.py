@@ -126,7 +126,7 @@ def load_mtr() -> dict[str, dict]:
             code,
             {
                 "code": code,
-                "zh": (row.get("Chinese Name") or "").strip(),
+                "zh": (row.get("Chinese Name") or "").strip().translate(str.maketrans({"茘": "荔"})),
                 "en": (row.get("English Name") or "").strip(),
                 "lines": [],
             },

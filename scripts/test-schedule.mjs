@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clockLabel, httpFailure, minutesLabel, normalizeSchedule } from "../src/schedule.js";
+import { clockLabel, httpFailure, minutesLabel, normalizeSchedule, routeLabel } from "../src/schedule.js";
 
 const names = { CHW: "柴灣", KET: "堅尼地城", SUN: "欣澳" };
 
@@ -21,7 +21,7 @@ test("live trains keep destination, platform and time", () => {
     data: {
       "ISL-CEN": {
         UP: [{ dest: "CHW", plat: "3", time: "2026-11-21 10:27:56", ttnt: "9", valid: "Y" }],
-        DOWN: [{ dest: "KET", plat: "4", time: "2026-11-21 10:26:10", ttnt: "0", valid: "N" }],
+        DOWN: [{ dest: "KET", plat: "4", time: "2026-11-21 10:26:10", ttnt: "0", valid: "N", route: "RAC" }],
       },
     },
   }, "ISL", "CEN", names);
@@ -30,7 +30,9 @@ test("live trains keep destination, platform and time", () => {
   assert.equal(result.directions[0].trains[0].minutesLabel, "2 分鐘");
   assert.equal(result.directions[0].trains[0].platform, "3");
   assert.equal(result.directions[1].trains[0].minutesLabel, "即將到站");
-  assert.equal(result.directions[1].trains[0].uncertain, true);
+  assert.equal(result.directions[1].trains[0].route, "RAC");
+  assert.equal(routeLabel("RAC"), "經馬場");
+  assert.equal(routeLabel(""), "");
 });
 
 test("racecourse with empty arrays explains there is no train", () => {

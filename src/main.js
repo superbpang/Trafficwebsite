@@ -1,7 +1,7 @@
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { LINE_BY_CODE, LINES, lineColorExpression, stationColorExpression } from "./lines.js";
-import { httpFailure, normalizeSchedule } from "./schedule.js";
+import { httpFailure, normalizeSchedule, routeLabel } from "./schedule.js";
 import { foldStationText, matchesStation } from "./search.js";
 
 const { Map, NavigationControl } = maplibregl;
@@ -158,11 +158,12 @@ function panelFrame(title, subtitle, body, onRefresh) {
 function trainRow(train) {
   const when = [train.minutesLabel, train.clock].filter(Boolean).join(" · ");
   const platform = train.platform ? `月台 ${train.platform}` : "";
+  const via = routeLabel(train.route);
   return h("li", {}, [
     h("strong", {}, `往${train.destName}`),
     h("span", {}, when || "時間待定"),
     platform ? h("span", { class: "muted" }, platform) : null,
-    train.uncertain ? h("span", { class: "muted" }, "此班次資料待確定") : null,
+    via ? h("span", { class: "muted" }, via) : null,
   ]);
 }
 
@@ -210,15 +211,33 @@ function renderSchedule(station, results) {
   ));
 }
 
+const SCHEDULE_TIMEOUT_MS = 8000;
+
+function readBody(response, signal) {
+  return new Promise((resolve, reject) => {
+    const fail = () => reject(new DOMException("The operation was aborted.", "AbortError"));
+    if (signal.aborted) {
+      fail();
+      return;
+    }
+    signal.addEventListener("abort", fail, { once: true });
+    response.json().then(resolve, reject);
+  });
+}
+
 async function fetchLine(line, code) {
   const url = `https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=${encodeURIComponent(line)}&sta=${encodeURIComponent(code)}&lang=TC`;
+  const deadline = new AbortController();
+  const timer = setTimeout(() => deadline.abort(), SCHEDULE_TIMEOUT_MS);
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: deadline.signal });
     if (!response.ok) return { line, error: httpFailure(response.status), schedule: null };
-    const payload = await response.json();
+    const payload = await readBody(response, deadline.signal);
     return { line, error: null, schedule: normalizeSchedule(payload, line, code, state.namesByCode) };
   } catch {
     return { line, error: "暫時未能連接港鐵班次服務，請稍後再按重新整理。", schedule: null };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

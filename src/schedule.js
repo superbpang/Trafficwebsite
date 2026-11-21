@@ -38,6 +38,10 @@ export function minutesLabel(trainTime, referenceTime) {
   return `${Math.floor(diff / 60000)} 分鐘`;
 }
 
+export function routeLabel(route) {
+  return route === "RAC" ? "經馬場" : "";
+}
+
 export function clockLabel(time) {
   const match = /(\d{2}:\d{2}):\d{2}/.exec(time || "");
   return match ? match[1] : "";
@@ -65,7 +69,7 @@ function asTrains(list, namesByCode, referenceTime) {
       minutesLabel: minutesLabel(item?.time, referenceTime),
       clock: clockLabel(item?.time),
       platform: item?.plat ? String(item.plat) : "",
-      uncertain: item?.valid === "N",
+      route: item?.route === "RAC" ? "RAC" : "",
     };
   });
 }
